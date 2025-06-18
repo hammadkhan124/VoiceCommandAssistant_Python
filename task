@@ -1,0 +1,101 @@
+import argparse
+import csv
+from tabulate import tabulate
+from typing import List, Dict, Union
+
+def read_csv(file_path: str) -> List[Dict[str, Union[str, float]]]:
+        """Read CSV file and return list of dictionaries."""
+        with open(file_path, mode='r') as file:
+            reader = csv.DictReader(file)
+            return [row for row in reader]
+
+def apply_filter(data: List[Dict[str, Union[str, float]]], 
+                    condition: str) -> List[Dict[str, Union[str, float]]]:
+        """Apply filtering condition to data."""
+        if not condition:
+            return data
+
+        column, operator, value = parse_condition(condition)
+
+        filtered_data = []
+        for row in data:
+            row_value = row[column]
+            try:
+                # Try to convert to float for numeric comparison
+                row_value_float = float(row_value)
+                value_float = float(value)
+                if operator == '>' and row_value_float > value_float:
+                    filtered_data.append(row)
+                elif operator == '<' and row_value_float < value_float:
+                    filtered_data.append(row)
+                elif operator == '=' and row_value_float == value_float:
+                    filtered_data.append(row)
+            except ValueError:
+                # Handle string comparison
+                if operator == '=' and row_value == value:
+                    filtered_data.append(row)
+
+        return filtered_data
+
+def parse_condition(condition: str) -> tuple:
+        """Parse condition string into column, operator, value."""
+        operators = ['>', '<', '=']
+        for op in operators:
+            if op in condition:
+                parts = condition.split(op)
+                return parts[0], op, parts[1]
+        raise ValueError(f"Invalid condition format: {condition}")
+
+def apply_aggregation(data: List[Dict[str, Union[str, float]]], 
+                         aggregation: str) -> Dict[str, float]:
+        """Apply aggregation to data."""
+        if not aggregation:
+            return {}
+
+        column, operation = aggregation.split('=')
+        numeric_values = []
+
+        for row in data:
+            try:
+                numeric_values.append(float(row[column]))
+            except ValueError:
+                raise ValueError(f"Cannot aggregate non-numeric column: {column}")
+
+        if not numeric_values:
+            return {}
+
+        if operation == 'avg':
+            result = sum(numeric_values) / len(numeric_values)
+        elif operation == 'min':
+            result = min(numeric_values)
+        elif operation == 'max':
+            result = max(numeric_values)
+        else:
+            raise ValueError(f"Unknown aggregation operation: {operation}")
+
+        return {operation: round(result, 2)}
+
+def main():
+        parser = argparse.ArgumentParser(description='Process CSV files with filtering and aggregation.')
+        parser.add_argument('--file', type=str, required=True, help='Path to CSV file')
+        parser.add_argument('--where', type=str, help='Filter condition (e.g., "rating>4.7")')
+        parser.add_argument('--aggregate', type=str, help='Aggregation condition (e.g., "rating=avg")')
+
+        args = parser.parse_args()
+
+        try:
+            data = read_csv(args.file)
+
+            if args.where:
+                data = apply_filter(data, args.where)
+
+            if args.aggregate:
+                result = apply_aggregation(data, args.aggregate)
+                print(tabulate([result], headers='keys', tablefmt='grid'))
+            else:
+                print(tabulate(data, headers='keys', tablefmt='grid'))
+        except Exception as e:
+            print(f"Error: {str(e)}")
+
+            if __name__ == '__main__':
+             main()
